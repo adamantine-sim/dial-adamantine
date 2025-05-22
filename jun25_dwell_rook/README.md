@@ -1,4 +1,4 @@
-This is a test application for fitting a Dial surrogate to MDF data for the dimensions of an LPBF melt pool.
+This is an INTERSECT workflow to optimize Adamantine simulations using Dial.
 
 See the Dial repo for more information:
 https://github.com/INTERSECT-DIAL/dial
