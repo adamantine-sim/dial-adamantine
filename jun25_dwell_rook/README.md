@@ -35,7 +35,7 @@ _Eventually just the data classes will be in their own package, but for now you 
 
 `python jun25-adamantine-client.py --config remote-conf.json`
 
-## Quickstart skeleton (Remote INTERSECT Core)
+## Quickstart skeleton (Local INTERSECT Core)
 1) Install the INTERSECT-SDK
 
 `pip install intersect-sdk`
