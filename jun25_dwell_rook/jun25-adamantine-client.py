@@ -58,7 +58,7 @@ INITIAL_MESHGRIDS = np.meshgrid(
 )
 INITIAL_POINTS_TO_PREDICT = np.hstack([mg.reshape(-1, 1) for mg in INITIAL_MESHGRIDS])
 NUM_ITERATIONS = 10
-INITIAL_DATA_SIZE = 2
+INITIAL_DATA_SIZE = 4
 
 
 # ADAMANTINE SPECIFIC FUNCTIONS ------------------------------------------------------------------------------------------------------
@@ -107,6 +107,8 @@ def analyze_results(volume_path):
 
 # Functions to set up the environment
 def setup():
+    print("Starting setup...")
+
     # Create the scratch volume if it doesn't already exist
     scratch_volume_name = "scratch_volume"
     volume_path = os.path.join(scratch_path, scratch_volume_name)
@@ -118,6 +120,8 @@ def setup():
     shutil.copyfile(input_filename, os.path.join(volume_path, input_filename))
     shutil.copyfile(run_script_filename, os.path.join(volume_path, run_script_filename))
     shutil.copyfile("mesh.inp", os.path.join(volume_path, "mesh.inp"))
+
+    print("Complete.")
 
     return volume_path
 
@@ -143,10 +147,13 @@ def get_data_point(x, mount_path_host):
 
     # Dummy score for testing
     #score = x[0]*x[0] + x[1]
+    #time.sleep(30)
 
     return score
 
 def get_data_point_batch(x_batch, mount_path_host):
+
+    print("Getting a batch of data points...")
 
     scores = []
     containers = []
@@ -182,6 +189,8 @@ def get_data_point_batch(x_batch, mount_path_host):
         #score = x[0]*x[0] + x[1]
 
         scores = scores + [score]
+
+    print("Complete.")
 
     return scores
 
@@ -327,6 +336,9 @@ class ActiveLearningOrchestrator:
         else:
             err_msg = f'Invalid operation {operation}'
             raise Exception(err_msg)  # noqa: TRY002
+        
+        print("Sending message...")
+
         return IntersectClientCallback(
             messages_to_send=[
                 IntersectDirectMessageParams(
@@ -369,10 +381,8 @@ class ActiveLearningOrchestrator:
             print(f'Running simulation at ({coord_str}): ', end='', flush=True)
             
             
-            #y = get_data_point(payload, self.volume_path)
-            #self.dataset_y.append(y)
-
-            y = get_data_point_batch([payload], self.volume_path)[0]
+            y = get_data_point(payload, self.volume_path)
+            #y = get_data_point_batch([payload], self.volume_path)[0]
             self.dataset_y.append(y)
 
             graph(self.mean_grid, self.variance, self.dataset_x, self.dataset_y)

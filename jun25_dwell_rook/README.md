@@ -3,7 +3,7 @@ This is a test application for fitting a Dial surrogate to MDF data for the dime
 See the Dial repo for more information:
 https://github.com/INTERSECT-DIAL/dial
 
-## Quickstart skeleton
+## Quickstart skeleton (Remote INTERSECT Core)
 1) Install the INTERSECT-SDK
 
 `pip install intersect-sdk`
@@ -16,12 +16,55 @@ _Eventually just the data classes will be in their own package, but for now you 
 
 3) Clone the repo
 
-`git clone https://code.ornl.gov/intersect/dialed/dial-am-melt-pool.git`
+`git clone https://github.com/adamantine-sim/dial-adamantine.git`
 
 4) Go into the root folder
 
-`cd dial-am-melt-pool`
+`cd dial-adamantine/jun25_dwell_rook`
 
-5) Run the client script
+5) Create utility and scratch directories
 
-`python am-mp-client.py --config remote-conf.json`
+`mkdir utils`
+`mkdir scratch`
+
+6) Clone the adamantine workflow scripts repo in the utils directory
+
+`git clone https://github.com/adamantine-sim/workflow-scripts.git workflow_scripts`
+
+7) Run the client script
+
+`python jun25-adamantine-client.py --config remote-conf.json`
+
+## Quickstart skeleton (Remote INTERSECT Core)
+1) Install the INTERSECT-SDK
+
+`pip install intersect-sdk`
+
+2) Clone and deploy Dial and INTERSECT Core Services locally
+
+`git clone https://github.com/INTERSECT-DIAL/dial`
+`cd dial`
+`docker compose up -d`
+`cd scripts`
+`python launch_service.py`
+
+3) Clone the repo
+
+`git clone https://github.com/adamantine-sim/dial-adamantine.git`
+
+4) Go into the root folder
+
+`cd dial-adamantine/jun25_dwell_rook`
+
+5) Create utility and scratch directories
+
+`mkdir utils`
+`mkdir scratch`
+
+6) Clone the adamantine workflow scripts repo in the utils directory
+
+`git clone https://github.com/adamantine-sim/workflow-scripts.git workflow_scripts`
+
+7) Run the client script
+
+`python jun25-adamantine-client.py --config local-conf.json`
