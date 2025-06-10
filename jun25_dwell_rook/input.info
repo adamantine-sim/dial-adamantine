@@ -50,23 +50,23 @@ materials
     initial_temperature 300 ; [K]
     solid
     {
-      specific_heat 500; [J/kg K]
-      density 7750; [kg/m^3]
-      thermal_conductivity_x 15 ; [W/m k]
-      thermal_conductivity_y 15 ; [W/m k]
-      thermal_conductivity_z 15 ; [W/m k]
-      emissivity 0.05
+      specific_heat 460; [J/kg K]
+      density 7803.63,-0.2338; [kg/m^3]
+      thermal_conductivity_x 15.76,0.0144; [W/m k]
+      thermal_conductivity_y 15.76,0.0144; [W/m k]
+      thermal_conductivity_z 15.76,0.0144; [W/m k]
+      emissivity 0.55
       convection_heat_transfer_coef 10; [W/m^2 K]
     }
     
     liquid
     {
-      specific_heat 500; [J/kg K]
-      density 7750; [kg/m^3]
-      thermal_conductivity_x 15 ; [W/m k]
-      thermal_conductivity_y 15 ; [W/m k]
-      thermal_conductivity_z 15 ; [W/m k]
-      emissivity 0.05
+      specific_heat 460; [J/kg K]
+      density 7803.63,-0.2338; [kg/m^3]
+      thermal_conductivity_x 15.76,0.0144; [W/m k]
+      thermal_conductivity_y 15.76,0.0144; [W/m k]
+      thermal_conductivity_z 15.76,0.0144; [W/m k]
+      emissivity 0.35
       convection_heat_transfer_coef 10; [W/m^2 K]
     }
 
