@@ -75,6 +75,8 @@ Note that the service must be started first, then the client.
 scratch_path = os.path.join(directory,'scratch')
 adamantine_filename = "solution_dwell"
 input_filename = "input.info"
+print_path = "print_layers"
+reheat_path = "reheat_layers"
 field_name = 'temperature'
 line_plots = False
 volume_plot = False
@@ -126,16 +128,27 @@ def setup():
     return volume_path
 
 def get_toolpath(volume_path, parameters):
-    # TODO: Need to add hooks for filename and location
+    toolpath_info = {}
+    toolpath_info['print_path'] = print_path
+    toolpath_info['reheat_path'] = reheat_path
+    toolpath_info['reheat_power'] = [500] # W
+    toolpath_info['scan_path_out'] = "scan_path.inp"
+    toolpath_info['lump_size'] = 2
+    toolpath_info['dwell_bottom'] = parameters['dwell_bottom']
+    toolpath_info['dwell_top'] = parameters['dwell_top']
     dwell_bottom = parameters['dwell_bottom']
     dwell_top = parameters['dwell_top']
-    dwell_0 = [dwell_bottom, dwell_top]
-    write_toolpath(dwell_0)
+    toolpath_info['dwell_0'] = [dwell_bottom, dwell_top]
+    toolpath_info['dwell_1'] = [0]  
+    write_toolpath(toolpath_info)
     toolpath_filename = "scan_path.inp"
     shutil.copyfile(toolpath_filename, os.path.join(volume_path, toolpath_filename))
 
 
 def get_data_point(x, mount_path_host):
+    
+    print("Getting data points...") 
+    
     toolpath_parameters = {}
     toolpath_parameters['dwell_bottom'] = x[0]
     toolpath_parameters['dwell_top'] = x[1]
@@ -148,7 +161,9 @@ def get_data_point(x, mount_path_host):
     # Dummy score for testing
     #score = x[0]*x[0] + x[1]
     #time.sleep(30)
-
+    
+    print("Complete.")
+    
     return score
 
 def get_data_point_batch(x_batch, mount_path_host):
@@ -284,7 +299,7 @@ class ActiveLearningOrchestrator:
         self.dataset_x = qmc.scale(self.unscaled_lhs, self.l_bounds, self.u_bounds).tolist()
         
         self.dataset_y = []
-
+    
         #for x_val in self.dataset_x:
         #     print("XVAL:", x_val)
         #     y_val = get_data_point(x_val, self.volume_path)
@@ -358,7 +373,6 @@ class ActiveLearningOrchestrator:
         has_error: bool,
         payload: INTERSECT_JSON_VALUE,
     ) -> IntersectClientCallback:
-        
         if has_error:
             print('============ERROR==============', file=sys.stderr)
             print(operation, file=sys.stderr)
@@ -415,7 +429,6 @@ if __name__ == '__main__':
     except (json.decoder.JSONDecodeError, OSError) as e:
         logger.critical('unable to load config file: %s', str(e))
         sys.exit(1)
-
     active_learning = ActiveLearningOrchestrator(
         service_destination=HierarchyConfig(
             **from_config_file['intersect-hierarchy']
