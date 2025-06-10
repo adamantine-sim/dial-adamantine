@@ -8,7 +8,6 @@ from typing import Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import pandas as pd
 
 import docker
 from scipy.stats import qmc
@@ -49,16 +48,48 @@ logger = logging.getLogger(__name__)
 
 # MANUAL INPUTS ------------------------------------------------------------------------------------------------------
 
-INITIAL_BOUNDS = [[10,60], [10,60]]
+#INITIAL_BOUNDS = [[10,60], [10,60]]
+# four dwell‐bottom chunks, four reheat‐temp chunks, one final dwell
+dwell0_bounds      = [[10,60] for _ in range(4)]  # dwell_0 chunked into 4 zones
+reheat_temp_bounds = [[0,900] for _ in range(4)]  # reheat temp chunked into 4 zones
+dwell1_bounds      = [[0,60]]  # final dwell one zone
+INITIAL_BOUNDS     = dwell0_bounds + reheat_temp_bounds + dwell1_bounds
 NUM_DIMS = len(INITIAL_BOUNDS)
 MESHGRID_SIZE = 101
-INITIAL_MESHGRIDS = np.meshgrid(
-    *[np.linspace(dim_bounds[0], dim_bounds[1], MESHGRID_SIZE) for dim_bounds in INITIAL_BOUNDS],
-    indexing='ij',
+#INITIAL_MESHGRIDS = np.meshgrid(
+#    *[np.linspace(dim_bounds[0], dim_bounds[1], MESHGRID_SIZE) for dim_bounds in INITIAL_BOUNDS],
+#    indexing='ij',
+#)
+#INITIAL_POINTS_TO_PREDICT = np.hstack([mg.reshape(-1, 1) for mg in INITIAL_MESHGRIDS])
+SLICE_DIMS = (0, 4)
+MESHGRID_SIZE = 101
+
+# Build a 2D mesh just for those two dims:
+low_high = [INITIAL_BOUNDS[i] for i in SLICE_DIMS]
+mgx, mgy = np.meshgrid(
+    np.linspace(low_high[0][0], low_high[0][1], MESHGRID_SIZE),
+    np.linspace(low_high[1][0], low_high[1][1], MESHGRID_SIZE),
+    indexing='ij'
 )
-INITIAL_POINTS_TO_PREDICT = np.hstack([mg.reshape(-1, 1) for mg in INITIAL_MESHGRIDS])
-NUM_ITERATIONS = 10
-INITIAL_DATA_SIZE = 4
+
+# Now we need to pack those into full 9-D points by fixing the OTHER dims at midpoints:
+fixed_vals = {
+    i: 0.5*(b[0]+b[1])
+    for i, b in enumerate(INITIAL_BOUNDS)
+    if i not in SLICE_DIMS
+}
+pts = []
+for xi, yi in zip(mgx.ravel(), mgy.ravel()):
+    full = np.zeros(NUM_DIMS)
+    full[SLICE_DIMS[0]] = xi
+    full[SLICE_DIMS[1]] = yi
+    for j, v in fixed_vals.items():
+        full[j] = v
+    pts.append(full)
+INITIAL_POINTS_TO_PREDICT = np.vstack(pts)
+
+NUM_ITERATIONS = 200
+INITIAL_DATA_SIZE = 90
 
 
 # ADAMANTINE SPECIFIC FUNCTIONS ------------------------------------------------------------------------------------------------------
@@ -97,7 +128,9 @@ def run_detached_adamantine(mount_path_host,idx):
     mount_path_container = "/home/volume"
     mount_string = [mount_path_host+":"+mount_path_container]
     run_command = "bash /home/volume/commands.sh 1"
-    container = client.containers.run(image_name, run_command, volumes=mount_string, detach=True, stderr=True, cpuset_cpus=str(idx))
+    n_cpus = os.cpu_count()
+    cpu_to_use = idx % n_cpus
+    container = client.containers.run(image_name, run_command, volumes=mount_string, detach=True, stderr=True)
     return container
 
 def analyze_results(volume_path):
@@ -131,15 +164,11 @@ def get_toolpath(volume_path, parameters):
     toolpath_info = {}
     toolpath_info['print_path'] = print_path
     toolpath_info['reheat_path'] = reheat_path
-    toolpath_info['reheat_power'] = [500] # W
+    toolpath_info['reheat_power'] = parameters['reheat_power'] # W
     toolpath_info['scan_path_out'] = "scan_path.inp"
     toolpath_info['lump_size'] = 2
-    toolpath_info['dwell_bottom'] = parameters['dwell_bottom']
-    toolpath_info['dwell_top'] = parameters['dwell_top']
-    dwell_bottom = parameters['dwell_bottom']
-    dwell_top = parameters['dwell_top']
-    toolpath_info['dwell_0'] = [dwell_bottom, dwell_top]
-    toolpath_info['dwell_1'] = [0]  
+    toolpath_info['dwell_0'] = parameters['dwell_0']
+    toolpath_info['dwell_1'] = parameters['dwell_1'] 
     write_toolpath(toolpath_info)
     toolpath_filename = "scan_path.inp"
     shutil.copyfile(toolpath_filename, os.path.join(volume_path, toolpath_filename))
@@ -149,9 +178,15 @@ def get_data_point(x, mount_path_host):
     
     print("Getting data points...") 
     
-    toolpath_parameters = {}
-    toolpath_parameters['dwell_bottom'] = x[0]
-    toolpath_parameters['dwell_top'] = x[1]
+    #toolpath_parameters = {}
+    #toolpath_parameters['dwell_bottom'] = x[0]
+    #toolpath_parameters['dwell_top'] = x[1]
+    
+    toolpath_parameters = {
+        'dwell_0'      : list(x[0:4]),
+        'reheat_power' : list(x[4:8]),
+        'dwell_1'      : [ x[8] ],
+    }
 
     get_toolpath(mount_path_host, toolpath_parameters)
 
@@ -177,9 +212,15 @@ def get_data_point_batch(x_batch, mount_path_host):
         batch_dir.mkdir(parents=True, exist_ok=True)
 
         x = x_batch[batch_index]
-        toolpath_parameters = {}
-        toolpath_parameters['dwell_bottom'] = x[0]
-        toolpath_parameters['dwell_top'] = x[1]
+        #toolpath_parameters = {}
+        #toolpath_parameters['dwell_bottom'] = x[0]
+        #toolpath_parameters['dwell_top'] = x[1]
+        toolpath_parameters = {
+            'dwell_0'      : list(x[0:4]),
+            'reheat_power' : list(x[4:8]),
+            'dwell_1'      : [ x[8] ],
+        }
+
 
         batch_dir = mount_path_host + '/' + str(int(batch_index))
 
@@ -210,71 +251,83 @@ def get_data_point_batch(x_batch, mount_path_host):
     return scores
 
 def graph(mean_grid, variance, dataset_x, dataset_y):
-        if NUM_DIMS == 2:
-            plt.clf()
-            plt.contourf(
-                INITIAL_MESHGRIDS[0],
-                INITIAL_MESHGRIDS[1],
-                mean_grid,
-                extend='both',
-            )
-            cbar = plt.colorbar()
-            cbar.set_label('Score')
-            plt.xlabel('Dwell bottom (s)')
-            plt.ylabel('Dwell top (s)')
-            # add black dots for data points and a red marker for the recommendation:
-            X_train = np.array(dataset_x)
-            plt.scatter(X_train[:, 0], X_train[:, 1], facecolor='none', color='black', marker='o')
+    plt.clf()
+    plt.contourf(mgx, mgy, self.mean_grid, extend='both')
+    cbar = plt.colorbar()
+    cbar.set_label('Score')
+    plt.xlabel('Dwell bottom (s)')
+    plt.ylabel('Dwell top (s)')
+    # overlay training points in the slice dims
+    X_train = np.array(dataset_x)
+    x_vals  = X_train[:, SLICE_DIMS[0]]
+    y_vals  = X_train[:, SLICE_DIMS[1]]
+    plt.scatter(
+        x_vals, y_vals,
+        facecolors='none', edgecolors='black', marker='o',
+        label='Training points'
+    )
+    # last BO suggestion in red
+    x_rec, y_rec = dataset_x[-1][SLICE_DIMS[0]], dataset_x[-1][SLICE_DIMS[1]]
+    plt.scatter(
+        x_rec, y_rec,
+        color='red', marker='x', s=100,
+        label='BO next point'
+    )
+    plt.legend(loc='best')
+    plt.savefig('function_value.png')
+    
+    # ---- Predictive VARIANCE contour ----
+    plt.clf()
+    cf = plt.contourf(mgx, mgy, variance, extend='both')
+    cbar = plt.colorbar(cf)
+    cbar.set_label('Predictive variance')
+    plt.xlabel(f'Dim {SLICE_DIMS[0]}')
+    plt.ylabel(f'Dim {SLICE_DIMS[1]}')
 
-            plt.savefig('function_value.png')
+    # reuse the same overlay
+    plt.scatter(x_vals, y_vals, facecolors='none', edgecolors='black', marker='o')
+    plt.scatter(x_next, y_next, color='red', marker='x', s=100)
 
-            plt.clf()
-            plt.contourf(
-                INITIAL_MESHGRIDS[0],
-                INITIAL_MESHGRIDS[1],
-                variance,
-                extend='both',
-            )
-            cbar = plt.colorbar()
-            cbar.set_label('Score')
-            plt.xlabel('Dwell bottom (s)')
-            plt.ylabel('Dwell top (s)')
-            # add black dots for data points and a red marker for the recommendation:
-            X_train = np.array(dataset_x)
-            plt.scatter(X_train[:, 0], X_train[:, 1], facecolor='none', color='black', marker='o')
+    plt.savefig('function_variance_slice.png')
+    
+    #---- 1D LINE-OUT through variance/mean at fixed y-index ----
+    # Choose the slice index along the second axis (e.g. first column)
+    j = 0
+    xs = mgx[:, j]
+    mu = mean_grid[:, j]
+    sigma = np.sqrt(variance[:, j])
 
-            plt.savefig('function_variance.png')
+    plt.clf()
+    plt.plot(xs, mu, '-', label='Mean')
+    plt.fill_between(xs, mu - sigma, mu + sigma, alpha=0.3, label='±1σ')
 
-            # Line plot
-            plt.clf()
-            plt.plot(INITIAL_MESHGRIDS[0][:,0], mean_grid[:,0],'b-')
-            upper_variance_bound = mean_grid[:,0]+variance[:,0]
-            lower_variance_bound = mean_grid[:,0]-variance[:,0]
+    # Overlay training points that lie at that fixed y-value (within tol)
+    tol = 1e-6
+    for xi, yi, yi_score in zip(x_vals, y_vals, dataset_y):
+        if abs(yi - mgy[0, j]) < tol:
+            plt.plot(xi, yi_score, 'ko')  # black circle
 
-            plt.fill_between(INITIAL_MESHGRIDS[0][:,0], upper_variance_bound, lower_variance_bound, alpha=0.9)
+    # Overlay the next suggestion if it’s on that slice
+    if abs(y_next - mgy[0, j]) < tol:
+        # assume you have its score in dataset_y[-1]
+        plt.plot(x_next, dataset_y[-1], 'rx', markersize=10)
 
-            tolerance = 1e-5
-            for idx, val in enumerate(dataset_x):
-                dwell_bottom = dataset_x[idx][0]
-                dwell_top = dataset_x[idx][1]
-                if (np.abs(dwell_bottom - 10.0) < tolerance):
-                    plt.plot(dwell_top, dataset_y[idx],'r.')
-
-            plt.savefig('lineout.png')
-
-        else:
-            fig, ax = plt.subplots(figsize=(8, 6))
-            message = (
-                'Number of dimensions is not equal to two -\nBayesian Optimization plot is not available.\n'
-                'Add plotting to the graph(self) function in\nautomated_client.py to generate a custom plot.'
-            )
-            ax.text(0.5, 0.5, message, fontsize=18, ha='center', va='center', wrap=True)
-            # Remove axes
-            ax.set_xticks([])
-            ax.set_yticks([])
-            fig.savefig('graph.png')
-
-
+    plt.xlabel(f'Dim {SLICE_DIMS[0]}')
+    plt.ylabel('Score')
+    plt.legend(loc='best')
+    plt.savefig('lineout_slice.png')
+    
+    for dim in range(4):
+        # fix all other dims (including your reheat chunks and dwell_1) at midpoints
+        xs, mu, sigma = get_lineout_for_dim(dim)
+        plt.figure()
+        plt.plot(xs, mu, '-')
+        plt.fill_between(xs, mu-sigma, mu+sigma, alpha=0.3)
+        plt.title(f'Line-out along dim {dim}')
+        plt.xlabel(f'Dim {dim}')
+        plt.ylabel('Score')
+        plt.savefig(f'lineout_dim{dim}.png')
+    
 # ORCHESTRATOR ------------------------------------------------------------------------------------------------------
 
 class ActiveLearningOrchestrator:
@@ -324,7 +377,7 @@ class ActiveLearningOrchestrator:
                 dataset_y=self.dataset_y,
                 bounds=INITIAL_BOUNDS,
                 kernel='rbf',
-                length_per_dimension=False,  # allow the matern to use separate length scales for the two parameters
+                length_per_dimension=True,  # allow the matern to use separate length scales for the two parameters
                 y_is_good=True,  
                 backend='sklearn',  # "sklearn" or "gpax"
                 seed=-1,  # Use seed = -1 for random results
@@ -385,8 +438,8 @@ class ActiveLearningOrchestrator:
         if operation == 'dial.update_workflow_with_data':
             return self.assemble_message('get_surrogate_values')
         if (operation == 'dial.get_surrogate_values'):  # if we receive a grid of surrogate values, record it for graphing, then ask for the next recommended point
-            self.mean_grid = np.array(payload[0]).reshape((MESHGRID_SIZE,) * NUM_DIMS)
-            self.variance = np.array(payload[1]).reshape((MESHGRID_SIZE,) * NUM_DIMS)
+            self.mean_grid = np.array(payload[0]).reshape((MESHGRID_SIZE,MESHGRID_SIZE))
+            self.variance = np.array(payload[1]).reshape((MESHGRID_SIZE,MESHGRID_SIZE))
             return self.assemble_message('get_next_point')
             
         if operation == 'dial.get_next_point':
