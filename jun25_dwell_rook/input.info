@@ -1,3 +1,4 @@
+
 units
 {
   mesh millimeter
@@ -17,7 +18,7 @@ geometry
   deposition_width 3.5e-3
   deposition_time 50
   deposition_lead_time 0
-  material_height 0.0019;
+  material_height 0.00;
 }
 
 physics
@@ -49,24 +50,24 @@ materials
     initial_temperature 300 ; [K]
     solid
     {
-      specific_heat 500; [J/kg K]
-      density 7750; [kg/m^3]
-      thermal_conductivity_x 15 ; [W/m k]
-      thermal_conductivity_y 15 ; [W/m k]
-      thermal_conductivity_z 15 ; [W/m k]
-      emissivity 0.05
-      convection_heat_transfer_coef 0.5; [W/m^2 K]
+      specific_heat 460; [J/kg K]
+      density 7803.63,-0.2338; [kg/m^3]
+      thermal_conductivity_x 15.76,0.0144; [W/m k]
+      thermal_conductivity_y 15.76,0.0144; [W/m k]
+      thermal_conductivity_z 15.76,0.0144; [W/m k]
+      emissivity 0.55
+      convection_heat_transfer_coef 10; [W/m^2 K]
     }
     
     liquid
     {
-      specific_heat 500; [J/kg K]
-      density 7750; [kg/m^3]
-      thermal_conductivity_x 15 ; [W/m k]
-      thermal_conductivity_y 15 ; [W/m k]
-      thermal_conductivity_z 15 ; [W/m k]
-      emissivity 0.05
-      convection_heat_transfer_coef 0.1; [W/m^2 K]
+      specific_heat 460; [J/kg K]
+      density 7803.63,-0.2338; [kg/m^3]
+      thermal_conductivity_x 15.76,0.0144; [W/m k]
+      thermal_conductivity_y 15.76,0.0144; [W/m k]
+      thermal_conductivity_z 15.76,0.0144; [W/m k]
+      emissivity 0.35
+      convection_heat_transfer_coef 10; [W/m^2 K]
     }
 
     solidus 1713; [K]
@@ -102,13 +103,13 @@ time_stepping
                         ; rk_fourth_order, bogacki_shampine, dopri,
                         ; fehlberg, cash_karp
   scan_path_for_duration true
-  time_step 5e-2; 5e-3 ; [s] 
+  time_step 5e-3 ; [s] 
 }
 
 post_processor
 {
   filename_prefix solution_dwell
-  time_steps_between_output 40
+  time_steps_between_output 400
   additional_output_refinement 0
 }
 
