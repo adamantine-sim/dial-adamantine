@@ -3,7 +3,7 @@
       "brokers": [
         {
           "username": "postman",
-          "password": "ZTQ0YjljYTk0MTBj",
+          "password": REDACTED,
           "host": "10.64.193.144",
           "port": 30010,
           "protocol": "amqp0.9.1"
